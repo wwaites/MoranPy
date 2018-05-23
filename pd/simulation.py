@@ -18,30 +18,30 @@ class Simulation(object):
         self.b, self.c = args.b, args.c
         self.theta = args.theta
 
-        self.kinds      = [0]*N
-        self.fitness    = [0.0]*N
-        self.prosperity = [0.0]*N
+        self.kinds      = [0]*self.N
+        self.fitness    = [0.0]*self.N
+        self.prosperity = [0.0]*self.N
 
         ## generate network
-        self.network = networkgen(N,E)
-        self.adj = [[] for i in range(N)]
-        for i in range(N):
-            for j in range(N):
+        self.network = networkgen(self.N,self.E)
+        self.adj = [[] for i in range(self.N)]
+        for i in range(self.N):
+            for j in range(self.N):
                 if self.network[i][j]==1:
                     self.adj[i].append(j)
 
         ## initialise payoff, etc matrices
-        R = b-c
-        S = -c
-        T = b
+        R = self.b-self.c
+        S = -self.c
+        T = self.b
         P = 0
         self.payoff = [[R,S],[T,P]]
-        self.payoffmax = (N-1)*b
-        self.payoffmin = -(N-1)*c
+        self.payoffmax = (self.N-1)*self.b
+        self.payoffmin = -(self.N-1)*self.c
 
-        for i in range(N):
+        for i in range(self.N):
             self.fitness[i] = game.fitness(i, self.payoff, self.adj, self.kinds)
-            self.prosperity[i] = pow(1+d, self.fitness[i])
+            self.prosperity[i] = pow(1+self.d, self.fitness[i])
 
     def remove(self):
         """
