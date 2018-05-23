@@ -190,6 +190,5 @@ def main():
     for n in anames:
         print("# %s = %s" % (n, getattr(args, n)))
 
-    sys.exit()
     s = Simulation(args)
     s.simulate()
