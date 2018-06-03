@@ -8,6 +8,8 @@ setup(
     entry_points={
         'console_scripts': [
             'pdsim = pd.simulation:main',
+            'uvroc = pd.uv:main',
+            'mvroc = pd.mv:main'
             ]
         }
     )
