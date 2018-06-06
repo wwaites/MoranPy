@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+from math import sqrt
 import copy
 import argparse
 
@@ -11,16 +12,21 @@ class Simulation(object):
     def __init__(self, args):
         self.N, self.E = args.N, args.E
         self.t0, self.Tt = args.t0, args.Tt
-        self.p, self.q = args.p, args.q
         self.m = args.m
-        self.d, self.g = args.d, args.g
-        self.v = args.v
+        self.d = args.d
+        self.cmean = args.cmean
+        self.cdev = sqrt(args.cvar)
+        self.dmean = args.dmean
+        self.ddev = sqrt(args.dvar)
+        self.threshold = args.threshold
         self.b, self.c = args.b, args.c
         self.theta = args.theta
 
         self.kinds      = [0]*self.N
         self.fitness    = [0.0]*self.N
         self.prosperity = [0.0]*self.N
+
+        self.fp, self.fn, self.tp, self.tn = 0, 0, 0, 0
 
         ## generate network
         self.network = networkgen(self.N,self.E)
@@ -80,6 +86,21 @@ class Simulation(object):
     def reputation(self, i, maxdegree):
         return self.v * pow(1 + self.g, len(self.adj[i]) - maxdegree)
 
+    def should_connect(self, i):
+        if self.kinds[i] == 0:
+            rand = np.random.normal(self.cmean, self.cdev)
+        else:
+            rand = np.random.normal(self.dmean, self.ddev)
+        if rand < self.threshold:
+            connect = True
+            if self.kinds[i] == 0: self.tp += 1
+            else: self.fp += 1
+        else:
+            connect = False
+            if self.kinds[i] == 0: self.tn += 1
+            else: self.fn += 1
+        return connect
+
     def simulate(self):
         t = 0
         mutant = False
@@ -105,11 +126,11 @@ class Simulation(object):
 
             tempneigh = []
             rand = np.random.rand(1)
-            if i != j and rand < self.reputation(j, maxdegree) * self.p:
+            if i != j and self.should_connect(j):
                 tempneigh.append(j)
             for k in self.adj[j]:
                 rand = np.random.rand(1)
-                if i != k and rand < self.reputation(k, maxdegree) * self.q:
+                if i != k and self.should_connect(k):
                     tempneigh.append(k)
 
             ## housekeeping
@@ -163,9 +184,8 @@ class Simulation(object):
             degreelist[t-1] = avedegree
             prosplist[t-1] = aveprosp
 
-            #   print("time="+str(t),'q='+str(q),'theta='+str(theta),avecoop)
             if t % 1000 == 0:
-                print("\t".join(map(str, [t, avecoop, avedegree, aveprosp, transitionNum])))
+                print("\t".join(map(str, [t, avecoop, avedegree, aveprosp, transitionNum, self.tp, self.fp, self.tn, self.fn])))
 
 def main():
     parser = argparse.ArgumentParser(prog = "pdsim")
@@ -173,12 +193,13 @@ def main():
     parser.add_argument("-E", default=400, type=int, help="Number of edges")
     parser.add_argument("--t0", default=10000, type=int, help="Settling time")
     parser.add_argument("--Tt", default=1000000, type=int, help="Simulation end time")
-    parser.add_argument("-p", default=0.6, type=float, help="Probability of connecting to role-model")
-    parser.add_argument("-q", default=0.85, type=float, help="Probability of connecting to role-model's neighbours")
     parser.add_argument("-m", default=0.0001, type=float, help="Probability of mutation")
     parser.add_argument("-d", default=0.01, type=float, help="Selection strength")
-    parser.add_argument("-g", default=0.01, type=float, help="Reliability of public information")
-    parser.add_argument("-v", default=0.9, type=float, help="Probability of correctly guessing cooperator")
+    parser.add_argument("-u", "--cmean", default=0.0, type=float, help="Mean of cooperator signal distribution")
+    parser.add_argument("--cvar", default=0.5, type=float, help="Defector signal distribution variance")
+    parser.add_argument("-v", "--dmean", default=0.5, type=float, help="Mean of defector signal distribution")
+    parser.add_argument("--dvar", default=0.5, type=float, help="Defector signal distribution variance")
+    parser.add_argument("-t", "--threshold", default=0.25, type=float, help="Discrimination threshold")
     parser.add_argument("-b", default=10, type=float, help="Benefit in the public good game")
     parser.add_argument("-c", default=3.333333, type=float, help="Cost in the public good game")
     parser.add_argument("--theta", default=1.0, type=float, help="Parameter for deletion")
