@@ -199,12 +199,18 @@ def main():
     parser.add_argument("--cvar", default=0.5, type=float, help="Defector signal distribution variance")
     parser.add_argument("-v", "--dmean", default=0.5, type=float, help="Mean of defector signal distribution")
     parser.add_argument("--dvar", default=0.5, type=float, help="Defector signal distribution variance")
-    parser.add_argument("-t", "--threshold", default=0.25, type=float, help="Discrimination threshold")
+    parser.add_argument("-t", "--threshold", default=None, type=float, help="Discrimination threshold")
     parser.add_argument("-b", default=10, type=float, help="Benefit in the public good game")
     parser.add_argument("-c", default=3.333333, type=float, help="Cost in the public good game")
     parser.add_argument("--theta", default=1.0, type=float, help="Parameter for deletion")
 
     args = parser.parse_args()
+
+    if args.threshold is None:
+        dm = abs(args.dmean - args.cmean)
+        x0 = min(args.dmean, args.cmean)
+        x1 = max(args.dmean, args.cmean)
+        args.threshold = np.random.uniform(x0-dm, x1+dm)
 
     anames = list(args.__dict__.keys())
     anames.sort()
