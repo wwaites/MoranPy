@@ -21,7 +21,7 @@ def select(problist):
             tgt = 0
         else:
             while (right-left)>1:
-                middle = math.floor((left+right)/2)
+                middle = int(math.floor((left+right)/2))
                 if rand<=culprob[middle]:
                     right = middle
                 else:
