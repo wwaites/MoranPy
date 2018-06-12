@@ -28,7 +28,7 @@ class Simulation(object):
 
         self.fp, self.fn, self.tp, self.tn = 0, 0, 0, 0
 
-        ## generate network
+        ## generate network
         self.network = networkgen(self.N,self.E)
         self.adj = [[] for i in range(self.N)]
         for i in range(self.N):
@@ -36,7 +36,7 @@ class Simulation(object):
                 if self.network[i][j]==1:
                     self.adj[i].append(j)
 
-        ## initialise payoff, etc matrices
+        ## initialise payoff, etc matrices
         R = self.b-self.c
         S = -self.c
         T = self.b
@@ -123,7 +123,7 @@ class Simulation(object):
             i = self.remove()
             j = self.select()
 
-            ## connect to role model and neighbours
+            ## connect to role model and neighbours
             maxdegree = max(map(len, self.adj))
 
             tempneigh = []
@@ -135,7 +135,7 @@ class Simulation(object):
                 if i != k and self.should_connect(k):
                     tempneigh.append(k)
 
-            ## housekeeping
+            ## housekeeping
             tempneighi = copy.deepcopy(self.adj[i])
             for k in tempneighi:
                 tempid = self.adj[k].index(i)
@@ -152,7 +152,7 @@ class Simulation(object):
 
             self.mutate(t, i, j)
 
-            ## recalculate fitness
+            ## recalculate fitness
             self.fitness[i] = 0.0
             for k in tempneigh:
                 self.adj[i].append(k)
@@ -164,7 +164,7 @@ class Simulation(object):
                 self.fitness[i] += self.payoff[self.kinds[i]][self.kinds[k]]
                 self.prosperity[i] = pow(1+self.d, self.fitness[i])
 
-            ## record data for output
+            ## record data for output
             if sum(self.kinds)!=0 and transitionStart==False and transition== False:
                 transitionStart = True
 
@@ -217,7 +217,7 @@ def main():
     anames = list(args.__dict__.keys())
     anames.sort()
     for n in anames:
-        print("# %s = %s" % (n, getattr(args, n)))
+        print("# %s = %s" % (n, getattr(args, n)))
 
     s = Simulation(args)
     s.simulate()
