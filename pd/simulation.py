@@ -49,6 +49,8 @@ class Simulation(object):
             self.fitness[i] = game.fitness(i, self.payoff, self.adj, self.kinds)
             self.prosperity[i] = pow(1+self.d, self.fitness[i])
 
+        self.prospnorm = 100.0 / ( self.N * (self.N-1) * (self.b - self.c))
+
     def remove(self):
         """
         Decide on which node to remove
@@ -97,8 +99,8 @@ class Simulation(object):
             else: self.fp += 1
         else:
             connect = False
-            if self.kinds[i] == 0: self.tn += 1
-            else: self.fn += 1
+            if self.kinds[i] == 0: self.fn += 1
+            else: self.tn += 1
         return connect
 
     def simulate(self):
@@ -112,9 +114,9 @@ class Simulation(object):
         avedegree = 0.0
         aveprosp = 0.0
 
-        cooplist = [0.0]*self.Tt
-        degreelist = [0.0]*self.Tt
-        prosplist = [0.0]*self.Tt
+        #cooplist = [0.0]*self.Tt
+        #degreelist = [0.0]*self.Tt
+        #prosplist = [0.0]*self.Tt
 
         while t < self.Tt:
             t = t+1
@@ -177,12 +179,12 @@ class Simulation(object):
                 transitionNum = transitionNum + 1
 
             avedegree = sum(map(len, self.adj)) / self.N
-            aveprosp = sum(self.prosperity) / self.N
+            aveprosp = sum(self.prosperity) * self.prospnorm
             avecoop = self.N - sum(self.kinds)
 
-            cooplist[t-1] = avecoop
-            degreelist[t-1] = avedegree
-            prosplist[t-1] = aveprosp
+            #cooplist[t-1] = avecoop
+            #degreelist[t-1] = avedegree
+            #prosplist[t-1] = aveprosp
 
             if t % 1000 == 0:
                 print("\t".join(map(str, [t, avecoop, avedegree, aveprosp, transitionNum, self.tp, self.fp, self.tn, self.fn])))
