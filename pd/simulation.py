@@ -179,7 +179,7 @@ class Simulation(object):
                 transitionNum = transitionNum + 1
 
             avedegree = sum(map(len, self.adj)) / self.N
-            aveprosp = sum(self.prosperity) * self.prospnorm
+            aveprosp = sum(self.fitness) * self.prospnorm
             avecoop = self.N - sum(self.kinds)
 
             #cooplist[t-1] = avecoop
