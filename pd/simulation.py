@@ -142,13 +142,9 @@ class Simulation(object):
                 del self.adj[k][tempid]
                 self.fitness[k] -= self.payoff[self.kinds[k]][self.kinds[i]]
                 self.prosperity[k] = pow(1+self.d, self.fitness[k])
-                tempid = self.adj[i].index(k)
-                del self.adj[i][tempid]
                 self.network[i][k] = 0
                 self.network[k][i] = 0
-
-            if len(self.adj[i])!=0:
-                print("System error!!!")
+            self.adj[i] = []
 
             self.mutate(t, i, j)
 
@@ -162,7 +158,7 @@ class Simulation(object):
                 self.fitness[k] += self.payoff[self.kinds[k]][self.kinds[i]]
                 self.prosperity[k] = pow(1+self.d, self.fitness[k])
                 self.fitness[i] += self.payoff[self.kinds[i]][self.kinds[k]]
-                self.prosperity[i] = pow(1+self.d, self.fitness[i])
+            self.prosperity[i] = pow(1+self.d, self.fitness[i])
 
             ## record data for output
             if sum(self.kinds)!=0 and transitionStart==False and transition== False:
@@ -188,6 +184,15 @@ class Simulation(object):
 
             if t % 1000 == 0:
                 print("\t".join(map(str, [t, avecoop, avedegree, aveprosp, transitionNum, self.tp, self.fp, self.tn, self.fn])))
+                #self.debug_node(50)
+
+    def debug_node(self, n):
+        print("debug:")
+        print("\tnode: %s, kind(%s)" % (n, self.kinds[n]))
+        print("\ttotal payoff: %s/%s" % (self.fitness[n], (self.N-1)*(self.b-self.c)))
+        print("\tfitness: %s" % self.prosperity[n])
+        print("\tneigh: %s" % self.adj[n])
+        print("\tkinds: %s" % (list(self.kinds[i] for i in self.adj[n])))
 
 def main():
     parser = argparse.ArgumentParser(prog = "pdsim")
