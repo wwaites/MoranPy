@@ -1,6 +1,6 @@
 import sys
 import numpy as np
-from math import sqrt
+from math import sqrt, log
 import copy
 import argparse
 
@@ -22,9 +22,34 @@ class Simulation(object):
         self.b, self.c = args.b, args.c
         self.theta = args.theta
 
-        self.kinds      = [0]*self.N
-        self.fitness    = [0.0]*self.N
-        self.prosperity = [0.0]*self.N
+        if args.choice == "private":
+            self._should_connect = self.should_connect_private
+        elif args.choice == "public":
+            self._should_connect = self.should_connect_public
+        elif args.choice == "and":
+            self._should_connect = lambda i: self.should_connect_private(i) and self.should_connect_public_and(i)
+        elif args.choice == "or":
+            self._should_connect = lambda i: self.should_connect_private(i) or self.should_connect_public_or(i)
+        elif args.choice == "xor":
+            self._should_connect = lambda i: self.should_connect_private(i) ^ self.should_connect_public_or(i)
+        else:
+            raise Exception("Unknown choice algorithm: %s" % args.choice)
+        if args.neg:
+            self._should_connect_neg = self._should_connect
+            self._should_connect = lambda i: not self.should_connect_neg(i)
+
+        self.sample = args.sample
+
+        self.kinds      = np.zeros(self.N, dtype=int)
+        self.fitness    = np.zeros(self.N)
+        self.prosperity = np.zeros(self.N)
+
+        ## cascade counter for nodes, private information says yes, do not connect
+        self.pcascadeids = np.zeros(self.N, dtype=int)
+        self.pcascades = { 0: 0 }
+        ## cascade counter for nodes, private information says no, connect anyways
+        self.ncascadeids = np.zeros(self.N, dtype=int)
+        self.ncascades = { 0: 0 }
 
         self.fp, self.fn, self.tp, self.tn = 0, 0, 0, 0
 
@@ -89,19 +114,48 @@ class Simulation(object):
         return self.v * pow(1 + self.g, len(self.adj[i]) - maxdegree)
 
     def should_connect(self, i):
+        choice = self._should_connect(i)
+        if choice:
+            if self.kinds[i] == 0:
+                self.tp += 1
+            else:
+                self.fp += 1
+                if not self.private_choice:
+                    self.pcascade = True
+        else:
+            if self.kinds[i] == 0:
+                self.fn += 1
+                if self.private_choice:
+                    self.ncascade = True
+            else:
+                self.tn += 1
+        return choice
+
+    def should_connect_private(self, i):
         if self.kinds[i] == 0:
             rand = np.random.normal(self.cmean, self.cdev)
         else:
             rand = np.random.normal(self.dmean, self.ddev)
         if rand < self.threshold:
-            connect = True
-            if self.kinds[i] == 0: self.tp += 1
-            else: self.fp += 1
+            self.private_choice = True
         else:
-            connect = False
-            if self.kinds[i] == 0: self.fn += 1
-            else: self.tn += 1
-        return connect
+            self.private_choice = False
+        return self.private_choice
+
+    def should_connect_public_and(self, i):
+        if len(self.adj[i]) >= self.avedegree:
+            self.public_choice = True
+        else:
+            self.public_choice = False
+        return self.public_choice
+
+    def should_connect_public_or(self, i):
+        if len(self.adj[i]) > self.avedegree:
+            self.public_choice = True
+        else:
+            self.public_choice = False
+        return self.public_choice
+
 
     def simulate(self):
         t = 0
@@ -110,13 +164,13 @@ class Simulation(object):
         transitionStart = False
 
         transitionNum = 0
-        avecoop = 0.0
-        avedegree = 0.0
-        aveprosp = 0.0
+        self.calculate_graph_statistics()
 
         #cooplist = [0.0]*self.Tt
         #degreelist = [0.0]*self.Tt
         #prosplist = [0.0]*self.Tt
+
+        print("\t".join(["time", "coop", "degree", "prosp", "trans", "TP", "FP", "TN", "FN", "ncasc", "pcasc", "e0", "e1"]))
 
         while t < self.Tt:
             t = t+1
@@ -125,6 +179,9 @@ class Simulation(object):
 
             ## connect to role model and neighbours
             maxdegree = max(map(len, self.adj))
+
+            ## reset cascade flags
+            self.ncascade = self.pcascade = False
 
             tempneigh = []
             rand = np.random.rand(1)
@@ -135,7 +192,24 @@ class Simulation(object):
                 if i != k and self.should_connect(k):
                     tempneigh.append(k)
 
-            ## housekeeping
+            ## count cascades
+            self.ncascadeids[i] = self.ncascadeids[j]
+            self.pcascadeids[i] = self.pcascadeids[j]
+            if self.ncascade:
+                nid = self.ncascadeids[i]
+                if nid == 0:
+                    nid = max(self.ncascadeids) + 1
+                    self.ncascadeids[i] = nid
+                self.ncascades[nid] = self.ncascades.get(nid, 0) + 1
+            if self.pcascade:
+                pid = self.pcascadeids[i]
+                if pid == 0:
+                    pid = max(self.pcascadeids) + 1
+                    self.pcascadeids[i] = pid
+                self.pcascades[pid] = self.pcascades.get(pid, 0) + 1
+
+            ## housekeeping, zero out references to node
+            ## to be removed
             tempneighi = copy.deepcopy(self.adj[i])
             for k in tempneighi:
                 tempid = self.adj[k].index(i)
@@ -146,6 +220,7 @@ class Simulation(object):
                 self.network[k][i] = 0
             self.adj[i] = []
 
+            ## possibly mutate
             self.mutate(t, i, j)
 
             ## recalculate fitness
@@ -174,17 +249,17 @@ class Simulation(object):
                 transition = False
                 transitionNum = transitionNum + 1
 
-            avedegree = sum(map(len, self.adj)) / self.N
-            aveprosp = sum(self.fitness) * self.prospnorm
-            avecoop = self.N - sum(self.kinds)
+            self.calculate_graph_statistics()
 
-            #cooplist[t-1] = avecoop
-            #degreelist[t-1] = avedegree
-            #prosplist[t-1] = aveprosp
+            if t % self.sample == 0:
+                nc, pc = max(self.ncascades.values()), max(self.pcascades.values())
+                e0, e1 = self.entropy()
+                print("\t".join(map(str, [t, self.avecoop, self.avedegree, self.aveprosp, transitionNum, self.tp, self.fp, self.tn, self.fn, nc, pc, e0, e1])))
 
-            if t % 1000 == 0:
-                print("\t".join(map(str, [t, avecoop, avedegree, aveprosp, transitionNum, self.tp, self.fp, self.tn, self.fn])))
-                #self.debug_node(50)
+    def calculate_graph_statistics(self):
+        self.avedegree = sum(map(len, self.adj)) / self.N
+        self.aveprosp = sum(self.fitness) * self.prospnorm
+        self.avecoop = self.N - sum(self.kinds)
 
     def debug_node(self, n):
         print("debug:")
@@ -194,6 +269,25 @@ class Simulation(object):
         print("\tneigh: %s" % self.adj[n])
         print("\tkinds: %s" % (list(self.kinds[i] for i in self.adj[n])))
 
+    def entropy(self):
+        defect = sum(self.kinds)
+        p = np.array([ len(self.kinds) - defect, defect ], dtype=float) / len(self.kinds)
+        q = np.zeros((2,2))
+        for i in range(self.N):
+            u = self.kinds[i]
+            for j in self.adj[i]:
+                v = self.kinds[j]
+                q[u,v] += 1
+
+        ## make q into a vector of the four kinds of path, and normalise
+        q = q.reshape((1,4))[0]
+        norm = sum(q)
+        if norm != 0:
+            q /= norm
+        e0 = abs(sum(i * log(i, 2) for i in p if i != 0) / log(0.5, 2))
+        e1 = abs(sum(i * log(i, 2) for i in q if i != 0) / log(0.25, 2))
+        return (e0, e1)
+
 def main():
     parser = argparse.ArgumentParser(prog = "pdsim")
     parser.add_argument("-N", default=100, type=int, help="Number of nodes")
@@ -202,7 +296,7 @@ def main():
     parser.add_argument("--Tt", default=1000000, type=int, help="Simulation end time")
     parser.add_argument("-m", default=0.0001, type=float, help="Probability of mutation")
     parser.add_argument("-d", default=0.01, type=float, help="Selection strength")
-    parser.add_argument("-u", "--cmean", default=0.0, type=float, help="Mean of cooperator signal distribution")
+    parser.add_argument("-u", "--cmean", default=-0.5, type=float, help="Mean of cooperator signal distribution")
     parser.add_argument("--cvar", default=0.5, type=float, help="Defector signal distribution variance")
     parser.add_argument("-v", "--dmean", default=0.5, type=float, help="Mean of defector signal distribution")
     parser.add_argument("--dvar", default=0.5, type=float, help="Defector signal distribution variance")
@@ -210,6 +304,9 @@ def main():
     parser.add_argument("-b", default=10, type=float, help="Benefit in the public good game")
     parser.add_argument("-c", default=3.333333, type=float, help="Cost in the public good game")
     parser.add_argument("--theta", default=1.0, type=float, help="Parameter for deletion")
+    parser.add_argument("--choice", default="private", help="Choice algorithm")
+    parser.add_argument("--neg", default=False, action="store_true", help="Negate choice")
+    parser.add_argument("--sample", default=1000, help="sampling frequency")
 
     args = parser.parse_args()
 
