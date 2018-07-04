@@ -15,6 +15,7 @@ class Simulation(object):
         self.m = args.m
         self.d = args.d
         self.p = args.p
+        self.q = args.q
         self.cmean = args.cmean
         self.cdev = sqrt(args.cvar)
         self.dmean = args.dmean
@@ -22,22 +23,6 @@ class Simulation(object):
         self.threshold = args.threshold
         self.b, self.c = args.b, args.c
         self.theta = args.theta
-
-        if args.choice == "private":
-            self._should_connect = self.should_connect_private
-        elif args.choice == "public":
-            self._should_connect = self.should_connect_public
-        elif args.choice == "and":
-            self._should_connect = lambda i: self.should_connect_private(i) and self.should_connect_public_and(i)
-        elif args.choice == "or":
-            self._should_connect = lambda i: self.should_connect_private(i) or self.should_connect_public_or(i)
-        elif args.choice == "xor":
-            self._should_connect = lambda i: self.should_connect_private(i) ^ self.should_connect_public_or(i)
-        else:
-            raise Exception("Unknown choice algorithm: %s" % args.choice)
-        if args.neg:
-            self._should_connect_neg = self._should_connect
-            self._should_connect = lambda i: not self.should_connect_neg(i)
 
         self.sample = args.sample
 
@@ -115,21 +100,41 @@ class Simulation(object):
         return self.v * pow(1 + self.g, len(self.adj[i]) - maxdegree)
 
     def should_connect(self, i):
-        choice = self._should_connect(i)
+        pubchoice = self.should_connect_public(i)
+        privchoice = self.should_connect_private(i)
+
+        if pubchoice and privchoice:
+            choice = True
+        elif not pubchoice and not privchoice:
+            choice = False
+        elif pubchoice:
+            if np.random.uniform(0, 1) < self.p:
+                choice = True
+            else:
+                choice = False
+        else:
+            if np.random.uniform(0, 1) < self.q:
+                choice = True
+            else:
+                choice = False
+
         if choice:
             if self.kinds[i] == 0:
                 self.tp += 1
             else:
                 self.fp += 1
-                if not self.private_choice:
-                    self.pcascade = True
+                # N-cascade: private information says no, connect anyways
+                if not privchoice:
+                    self.ncascade = True
         else:
             if self.kinds[i] == 0:
                 self.fn += 1
-                if self.private_choice:
+                # P-cascade: private information says yes, do not connect
+                if privchoice:
                     self.ncascade = True
             else:
                 self.tn += 1
+
         return choice
 
     def should_connect_private(self, i):
@@ -138,28 +143,15 @@ class Simulation(object):
         else:
             rand = np.random.normal(self.dmean, self.ddev)
         if rand < self.threshold:
-            self.private_choice = True
+            return True
         else:
-            self.private_choice = False
-        return self.private_choice
+            return False
 
-    def should_connect_public_and(self, i):
-        if len(self.adj[i]) >= self.avedegree:
-            rand = np.random.uniform(1.0)
-            if rand < self.p:
-                self.public_choice = True
-            else:
-                self.public_choice = False
-        else:
-            self.public_choice = False
-        return self.public_choice
-
-    def should_connect_public_or(self, i):
+    def should_connect_public(self, i):
         if len(self.adj[i]) > self.avedegree:
-            self.public_choice = True
+            return True
         else:
-            self.public_choice = False
-        return self.public_choice
+            return False
 
 
     def simulate(self):
@@ -309,10 +301,9 @@ def main():
     parser.add_argument("-b", default=10, type=float, help="Benefit in the public good game")
     parser.add_argument("-c", default=3.333333, type=float, help="Cost in the public good game")
     parser.add_argument("--theta", default=1.0, type=float, help="Parameter for deletion")
-    parser.add_argument("--choice", default="private", help="Choice algorithm")
-    parser.add_argument("--neg", default=False, action="store_true", help="Negate choice")
-    parser.add_argument("--sample", default=1000, help="sampling frequency")
-    parser.add_argument("-p", default=0.6, help="Public information probability")
+    parser.add_argument("-p", default=0.8, help="Public information probability")
+    parser.add_argument("-q", default=0.8, help="Private information probability")
+    parser.add_argument("--sample", default=1000, type=int, help="Sampling interval")
 
     args = parser.parse_args()
 
