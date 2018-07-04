@@ -14,6 +14,7 @@ class Simulation(object):
         self.t0, self.Tt = args.t0, args.Tt
         self.m = args.m
         self.d = args.d
+        self.p = args.p
         self.cmean = args.cmean
         self.cdev = sqrt(args.cvar)
         self.dmean = args.dmean
@@ -144,7 +145,11 @@ class Simulation(object):
 
     def should_connect_public_and(self, i):
         if len(self.adj[i]) >= self.avedegree:
-            self.public_choice = True
+            rand = np.random.uniform(1.0)
+            if rand < self.p:
+                self.public_choice = True
+            else:
+                self.public_choice = False
         else:
             self.public_choice = False
         return self.public_choice
@@ -307,6 +312,7 @@ def main():
     parser.add_argument("--choice", default="private", help="Choice algorithm")
     parser.add_argument("--neg", default=False, action="store_true", help="Negate choice")
     parser.add_argument("--sample", default=1000, help="sampling frequency")
+    parser.add_argument("-p", default=0.6, help="Public information probability")
 
     args = parser.parse_args()
 
