@@ -6,10 +6,12 @@ import argparse
 
 from pd.network import networkgen
 from pd.selection import select
+from pd.xgmml import savexgmml
 import pd.game as game
 
 class Simulation(object):
     def __init__(self, args):
+        self.args = args
         self.N, self.E = args.N, args.E
         self.t0, self.Tt = args.t0, args.Tt
         self.m = args.m
@@ -25,6 +27,8 @@ class Simulation(object):
         self.theta = args.theta
 
         self.sample = args.sample
+
+        self.xgmml = args.xgmml
 
         self.kinds      = np.zeros(self.N, dtype=int)
         self.fitness    = np.zeros(self.N)
@@ -160,7 +164,7 @@ class Simulation(object):
         transition = False
         transitionStart = False
 
-        transitionNum = 0
+        self.transitionNum = 0
         self.calculate_graph_statistics()
 
         #cooplist = [0.0]*self.Tt
@@ -239,19 +243,23 @@ class Simulation(object):
             if sum(self.kinds)==self.N and transitionStart == True and transition == False:
                 transitionStart = False
                 transition = True
-                transitionNum = transitionNum + 1
+                self.transitionNum = self.transitionNum + 1
 
             if sum(self.kinds)==0 and transitionStart == False and transition == True:
                 transitionStart = True
                 transition = False
-                transitionNum = transitionNum + 1
+                self.transitionNum = self.transitionNum + 1
 
             self.calculate_graph_statistics()
+
+            if self.xgmml is not None:
+                filename = "%s.%s.xml" % (self.xgmml, t)
+                savexgmml(self, t, filename)
 
             if t % self.sample == 0:
                 nc, pc = max(self.ncascades.values()), max(self.pcascades.values())
                 e0, e1 = self.entropy()
-                print("\t".join(map(str, [t, self.avecoop, self.avedegree, self.aveprosp, transitionNum, self.tp, self.fp, self.tn, self.fn, nc, pc, e0, e1])))
+                print("\t".join(map(str, [t, self.avecoop, self.avedegree, self.aveprosp, self.transitionNum, self.tp, self.fp, self.tn, self.fn, nc, pc, e0, e1])))
 
     def calculate_graph_statistics(self):
         self.avedegree = sum(map(len, self.adj)) / self.N
@@ -304,6 +312,7 @@ def main():
     parser.add_argument("-p", type=float, default=0.8, help="Public information probability")
     parser.add_argument("-q", type=float, default=0.8, help="Private information probability")
     parser.add_argument("--sample", default=1000, type=int, help="Sampling interval")
+    parser.add_argument("-x", "--xgmml", default=None, help="Save XGMML graph pictures")
 
     args = parser.parse_args()
 
