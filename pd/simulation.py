@@ -301,8 +301,8 @@ def main():
     parser.add_argument("-b", default=10, type=float, help="Benefit in the public good game")
     parser.add_argument("-c", default=3.333333, type=float, help="Cost in the public good game")
     parser.add_argument("--theta", default=1.0, type=float, help="Parameter for deletion")
-    parser.add_argument("-p", default=0.8, help="Public information probability")
-    parser.add_argument("-q", default=0.8, help="Private information probability")
+    parser.add_argument("-p", type=float, default=0.8, help="Public information probability")
+    parser.add_argument("-q", type=float, default=0.8, help="Private information probability")
     parser.add_argument("--sample", default=1000, type=int, help="Sampling interval")
 
     args = parser.parse_args()
