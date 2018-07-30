@@ -164,6 +164,14 @@ class Simulation(object):
         transition = False
         transitionStart = False
 
+        transitionUp = True
+        transitionUpStart = 0
+        transitionUpTime = 0
+        transitionUpCount = 0
+        transitionDownStart = 0
+        transitionDownTime = 0
+        transitionDownCount = 0
+
         self.transitionNum = 0
         self.calculate_graph_statistics()
 
@@ -171,7 +179,7 @@ class Simulation(object):
         #degreelist = [0.0]*self.Tt
         #prosplist = [0.0]*self.Tt
 
-        print("\t".join(["time", "coop", "degree", "prosp", "trans", "TP", "FP", "TN", "FN", "ncasc", "pcasc", "e0", "e1"]))
+        print("\t".join(["time", "coop", "degree", "prosp", "trans", "TP", "FP", "TN", "FN", "ncasc", "pcasc", "e0", "e1", "tut", "tuc", "tdt", "tdc"]))
 
         while t < self.Tt:
             t = t+1
@@ -236,6 +244,19 @@ class Simulation(object):
                 self.fitness[i] += self.payoff[self.kinds[i]][self.kinds[k]]
             self.prosperity[i] = pow(1+self.d, self.fitness[i])
 
+            if sum(self.kinds) == self.N:
+                if transitionUp:
+                    transitionUpTime += t - transitionUpStart
+                    transitionUpCount += 1
+                transitionUp = False
+                transitionDownStart = t
+            if sum(self.kinds) == 0:
+                if not transitionUp:
+                    transitionDownTime += t - transitionDownStart
+                    transitionDownCount += 1
+                transitionUp = True
+                transitionUpStart = t
+
             ## record data for output
             if sum(self.kinds)!=0 and transitionStart==False and transition== False:
                 transitionStart = True
@@ -259,7 +280,11 @@ class Simulation(object):
             if t % self.sample == 0:
                 nc, pc = max(self.ncascades.values()), max(self.pcascades.values())
                 e0, e1 = self.entropy()
-                print("\t".join(map(str, [t, self.avecoop, self.avedegree, self.aveprosp, self.transitionNum, self.tp, self.fp, self.tn, self.fn, nc, pc, e0, e1])))
+                print("\t".join(map(str,
+                                    [t, self.avecoop, self.avedegree, self.aveprosp, self.transitionNum,
+                                     self.tp, self.fp, self.tn, self.fn, nc, pc, e0, e1,
+                                     transitionUpTime, transitionUpCount, transitionDownTime, transitionDownCount
+                                    ])))
 
     def calculate_graph_statistics(self):
         self.avedegree = sum(map(len, self.adj)) / self.N
@@ -329,3 +354,6 @@ def main():
 
     s = Simulation(args)
     s.simulate()
+
+    ## TODO: repeatable seed
+    ## TODO: collapse and recovery time
