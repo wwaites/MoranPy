@@ -338,9 +338,11 @@ def main():
     parser.add_argument("-q", type=float, default=0.8, help="Private information probability")
     parser.add_argument("--sample", default=1000, type=int, help="Sampling interval")
     parser.add_argument("-x", "--xgmml", default=None, help="Save XGMML graph pictures")
+    parser.add_argument("-s", "--seed", default=1, type=int, help="Random Seed")
 
     args = parser.parse_args()
 
+    np.random.seed(args.seed)
     if args.threshold is None:
         dm = abs(args.dmean - args.cmean)
         x0 = min(args.dmean, args.cmean)
