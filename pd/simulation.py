@@ -135,7 +135,7 @@ class Simulation(object):
                 self.fn += 1
                 # P-cascade: private information says yes, do not connect
                 if privchoice:
-                    self.ncascade = True
+                    self.pcascade = True
             else:
                 self.tn += 1
 
